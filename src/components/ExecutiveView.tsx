@@ -99,6 +99,12 @@ export default function ExecutiveView({
     else currentBalance -= t.amount;
   });
 
+  // Budget calculation
+  const totalBudget = 1000000; // 1 million PHP
+  const budgetUsed = currentBalance < 0 ? Math.abs(currentBalance) : 0;
+  const budgetRemaining = totalBudget - budgetUsed;
+  const budgetPercentage = (budgetUsed / totalBudget) * 100;
+
   const totalMembers = members.length;
   const activeMembers = members.filter(m => m.status === 'Active').length;
   const pendingResolutions = resolutions.filter(r => r.status === 'Pending Approval');
@@ -674,6 +680,54 @@ export default function ExecutiveView({
             <p className="text-xs text-[#5D6B54] mt-1 font-medium">
               Kon adunay bag-ong eleksyon ug pulihan ang Presidente, gamita kini nga pamaagi aron pormal nga i-turnover ang system credentials, mga pundo, ug rekord sa asosasyon ngadto sa bag-ong opisyal.
             </p>
+          </div>
+
+          {/* BUDGET & FINANCIAL STATUS SECTION */}
+          <div className="bg-gradient-to-br from-[#EAF4EC] to-[#C8E6C9] border-2 border-[#A5D6A7] rounded-3xl p-6 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Coins className="w-6 h-6 text-[#1B4332]" />
+              <h4 className="text-sm font-black text-[#1B4332] uppercase tracking-wider font-display">Budget & Financial Status</h4>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              {/* Total Budget */}
+              <div className="bg-white/80 border border-[#A5D6A7] rounded-2xl p-4 text-center shadow-sm">
+                <p className="text-[10px] text-[#5D6B54] font-bold uppercase tracking-wider">Total Budget</p>
+                <p className="text-2xl font-black text-[#1B4332] mt-2">₱{totalBudget.toLocaleString()}</p>
+                <p className="text-[9px] text-[#2D6A4F] mt-1 font-medium">2026 Allocation</p>
+              </div>
+
+              {/* Used */}
+              <div className="bg-white/80 border border-[#A5D6A7] rounded-2xl p-4 text-center shadow-sm">
+                <p className="text-[10px] text-[#5D6B54] font-bold uppercase tracking-wider">Used</p>
+                <p className="text-2xl font-black text-[#E65100] mt-2">₱{budgetUsed.toLocaleString()}</p>
+                <p className="text-[9px] text-[#BF360C] mt-1 font-medium">{budgetPercentage.toFixed(1)}% of budget</p>
+              </div>
+
+              {/* Remaining */}
+              <div className="bg-white/80 border border-[#A5D6A7] rounded-2xl p-4 text-center shadow-sm">
+                <p className="text-[10px] text-[#5D6B54] font-bold uppercase tracking-wider">Remaining</p>
+                <p className="text-2xl font-black text-[#2D6A4F] mt-2">₱{budgetRemaining.toLocaleString()}</p>
+                <p className="text-[9px] text-[#1B4332] mt-1 font-medium">Available</p>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <div className="w-full bg-[#D5F4E6] rounded-full h-3 border border-[#A5D6A7] overflow-hidden">
+                <div
+                  className={`h-3 rounded-full transition-all ${
+                    budgetPercentage < 50 ? 'bg-[#2D6A4F]' : budgetPercentage < 80 ? 'bg-[#FFB300]' : 'bg-[#E65100]'
+                  }`}
+                  style={{ width: `${Math.min(budgetPercentage, 100)}%` }}
+                />
+              </div>
+              <p className="text-[9px] text-[#5D6B54] font-medium text-center">
+                {budgetPercentage < 50 && '✅ Healthy budget usage — Keep monitoring'}
+                {budgetPercentage >= 50 && budgetPercentage < 80 && '📊 Moderate budget usage — Approaching caution level'}
+                {budgetPercentage >= 80 && '⚠️ High budget usage — Immediate review recommended'}
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
