@@ -1,5 +1,5 @@
-import { getPool, isDatabaseConfigured, saveFullStateToPostgres } from '../_db';
-import { sendResponse, parseRequestBody } from '../_helper';
+import { getPool, isDatabaseConfigured, saveFullStateToPostgres } from './db';
+import { sendResponse, parseRequestBody } from './helper';
 
 export default async function handler(req: any, res: any) {
   try {
@@ -23,17 +23,22 @@ export default async function handler(req: any, res: any) {
 
     const pool = getPool();
     const body = await parseRequestBody(req);
-    await saveFullStateToPostgres(pool, body);
+    const savePromise = saveFullStateToPostgres(pool, body);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Cloud DB push timed out after 6 seconds.')), 6000)
+    );
+
+    await Promise.race([savePromise, timeoutPromise]);
     return sendResponse(res, 200, {
       success: true,
-      message: 'State successfully synced to Aiven PostgreSQL!',
+      message: 'State successfully synced to PostgreSQL Cloud DB!',
     });
   } catch (error: any) {
-    console.warn('[Aiven Push Warning]:', error?.message || error);
+    console.warn('[Cloud DB Push Warning]:', error?.message || error);
     return sendResponse(res, 200, {
       success: true,
       offlineMode: true,
-      message: `Saved locally. Cloud sync pending reconnection: ${error.message}`,
+      message: `Saved locally. Cloud sync pending reconnection: ${error?.message || 'Database unavailable'}`,
     });
   }
 }

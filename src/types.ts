@@ -212,4 +212,17 @@ export interface HogRaisingState {
   closedYears?: number[];
 }
 
+export interface DatabaseStatus {
+  connected: boolean;
+  configured: boolean;
+  provider: 'Supabase' | 'PostgreSQL' | 'Local Storage' | string;
+  database?: string;
+  timestamp?: string;
+  error?: string;
+  message?: string;
+  checking?: boolean;
+  tableCounts?: Record<string, number>;
+  totalRecords?: number;
+}
+
 
