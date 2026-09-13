@@ -626,10 +626,10 @@ export default function App() {
       systemLogs?: SystemLog[];
       deletedIds?: StoredDeletedIds;
     },
-    options?: { silent?: boolean; source?: string }
+    options?: { silent?: boolean; source?: string; force?: boolean }
   ): Promise<boolean> => {
     if (!navigator.onLine) return false;
-    if (isSyncingRef.current) {
+    if (isSyncingRef.current && !options?.force) {
       console.log('[Auto-Sync]: Synchronization already in-flight, skipping duplicate dispatch.');
       return false;
     }
@@ -1005,36 +1005,67 @@ export default function App() {
     }
   };
 
-  const handleDeleteMember = (id: string) => {
+  const handleDeleteMember = async (id: string) => {
     const targetMember = members.find(m => m.id === id);
-    const mName = targetMember ? targetMember.name : 'Unknown';
+    const mName = targetMember ? targetMember.name : 'Farmer';
     
+    // 1. Immediately remove from local state and storage
     const updated = members.filter(m => m.id !== id);
     setMembers(updated);
     updateStorage('bafa_members', updated);
     storeDeletedId('members', id);
 
-    // Also remove their portal user account so no orphan login accounts remain
-    const updatedUsers = users.filter(u => u.id !== id && u.memberIdNumber !== targetMember?.memberIdNumber);
-    const userRemoved = updatedUsers.length !== users.length;
-    if (userRemoved) {
+    // 2. Identify linked portal user accounts by ID, memberIdNumber, or matching name
+    const matchedUsers = users.filter(u => 
+      u.id === id || 
+      (targetMember?.memberIdNumber && u.memberIdNumber === targetMember.memberIdNumber) ||
+      (targetMember?.name && u.role === 'Member' && u.name.trim().toLowerCase() === targetMember.name.trim().toLowerCase())
+    );
+    const matchedUserIds = matchedUsers.map(u => u.id);
+
+    const updatedUsers = users.filter(u => !matchedUserIds.includes(u.id));
+    if (matchedUserIds.length > 0) {
       setUsers(updatedUsers);
       updateStorage('bafa_users', updatedUsers);
-      storeDeletedId('users', id);
+      matchedUserIds.forEach(uid => storeDeletedId('users', uid));
     }
 
-    // Direct and permanent removal from PostgreSQL Cloud Database
-    deleteFromDatabase('member', id);
-    if (userRemoved) {
-      deleteFromDatabase('user', id);
-    }
+    // Keep appDataRef up to date immediately for immediate subsequent sync dispatches
+    appDataRef.current = {
+      ...appDataRef.current,
+      members: updated,
+      users: updatedUsers
+    };
+
+    // 3. Directly dispatch immediate database delete requests
+    const deletePromises: Promise<boolean>[] = [deleteFromDatabase('member', id)];
+    matchedUserIds.forEach(uid => {
+      deletePromises.push(deleteFromDatabase('user', uid));
+    });
 
     if (isOnline) {
       logAction('Deleted Farmer Registration', `Removed member registration for: ${mName}`);
-      showToastMessage(`Removed ${mName} from roster. Auto-syncing to database...`, 'warning');
-      pushAllDataToCloud({ members: updated, users: updatedUsers }, { silent: true, source: 'Member Deletion' });
+      showToastMessage(`Removed ${mName} from roster. Syncing to database...`, 'warning');
+
+      // Await direct deletes, then dispatch state push with explicit deletedIds payload
+      try {
+        await Promise.allSettled(deletePromises);
+      } catch {}
+
+      const allDeleted = getStoredDeletedIds();
+      pushAllDataToCloud(
+        { 
+          members: updated, 
+          users: updatedUsers,
+          deletedIds: allDeleted
+        }, 
+        { silent: true, source: 'Member Deletion', force: true }
+      );
     } else {
       addToSyncQueue('delete', 'member', { id, name: mName });
+      matchedUserIds.forEach(uid => {
+        addToSyncQueue('delete', 'user', { id: uid, name: mName });
+      });
       showToastMessage(`Removed ${mName} offline. Will automatically sync to database on connection.`, 'warning');
     }
   };

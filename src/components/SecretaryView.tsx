@@ -513,9 +513,13 @@ export default function SecretaryView({
                             </button>
                             <button
                               id={`delete-member-${member.id}`}
-                              onClick={() => onDeleteMember(member.id)}
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to remove "${member.name}" from the member roster? This will also remove any linked portal login and synchronize immediately to the cloud database.`)) {
+                                  onDeleteMember(member.id);
+                                }
+                              }}
                               className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-all inline-flex items-center justify-center cursor-pointer"
-                              title="Remove member"
+                              title="Delete member from database"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
